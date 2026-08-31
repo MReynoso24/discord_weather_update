@@ -1,0 +1,48 @@
+name: UY Weather/Emergency Alerts to Discord
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub Actions cron can lag a few minutes under load;
+    # that's fine for this use case. Adjust freely.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
+
+# Prevent overlapping runs from racing on alert_state.json
+concurrency:
+  group: uy-alerts
+  cancel-in-progress: false
+
+permissions:
+  contents: write  # needed to commit the updated alert_state.json back
+
+jobs:
+  check-alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run alert monitor
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python uy_alerts_to_discord.py
+
+      - name: Commit updated state file
+        run: |
+          git config user.name "uy-alerts-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add alert_state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update alert state [skip ci]"
+            git push
+          else
+            echo "No state change, nothing to commit."
+          fi
