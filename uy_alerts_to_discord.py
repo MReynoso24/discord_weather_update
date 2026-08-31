@@ -140,21 +140,32 @@ def check_inumet() -> dict:
 # ---------------------------------------------------------------------------
 # Discord
 # ---------------------------------------------------------------------------
-def post_embeds_to_discord(embeds: list[dict]) -> None:
-    """Post up to 10 embeds in one webhook message (Discord's per-message cap)."""
+def post_embeds_to_discord(embeds: list[dict], mention_everyone: bool = False) -> None:
+    """Post up to 10 embeds in one webhook message (Discord's per-message cap).
+
+    If mention_everyone is True, "@everyone" is prepended as plain content
+    on the FIRST chunk only (so it pings once, not once per 10 embeds).
+    """
     if not DISCORD_WEBHOOK_URL or "PASTE_YOUR" in DISCORD_WEBHOOK_URL:
         log.warning("DISCORD_WEBHOOK_URL not configured; skipping post. Embeds were:\n%s", embeds)
         return
 
     for chunk_start in range(0, len(embeds), 10):
         chunk = embeds[chunk_start:chunk_start + 10]
-        resp = requests.post(DISCORD_WEBHOOK_URL, json={"embeds": chunk}, timeout=15)
+        payload = {"embeds": chunk}
+        if mention_everyone and chunk_start == 0:
+            payload["content"] = "@everyone"
+            # Webhooks need this explicitly, or Discord silently strips the
+            # mention and it shows as plain text instead of pinging.
+            payload["allowed_mentions"] = {"parse": ["everyone"]}
+        resp = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=15)
         resp.raise_for_status()
     log.info("Posted %d embed(s) to Discord.", len(embeds))
 
 
-def post_simple_to_discord(title: str, description: str, url: str, color: int) -> None:
-    post_embeds_to_discord([{"title": title, "description": description[:3900], "url": url, "color": color}])
+def post_simple_to_discord(title: str, description: str, url: str, color: int, mention_everyone: bool = False) -> None:
+    embed = {"title": title, "description": description[:3900], "url": url, "color": color}
+    post_embeds_to_discord([embed], mention_everyone=mention_everyone)
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +181,7 @@ def main():
         if state.get("inumet_hash") != h:
             state["inumet_hash"] = h
             if inumet["active"]:
-                post_embeds_to_discord(inumet["embeds"])
+                post_embeds_to_discord(inumet["embeds"], mention_everyone=True)
             else:
                 # Only announce the "all clear" if we previously had an active warning
                 if state.get("inumet_was_active"):
@@ -179,6 +190,7 @@ def main():
                         description="No hay advertencias meteorológicas vigentes.",
                         url=INUMET_PAGE_URL,
                         color=0x2ECC71,  # green
+                        mention_everyone=True,
                     )
             state["inumet_was_active"] = inumet["active"]
         else:
