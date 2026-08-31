@@ -1,12 +1,13 @@
 """
-Monitors INUMET (weather warnings) and SINAE (emergency updates) and
-posts new alerts to a Discord channel via webhook.
+Monitors INUMET (weather warnings) and posts new/changed alerts to a
+Discord channel via webhook.
 
-No official API exists for either source, so this polls their public
-pages and only notifies Discord when content actually changes.
+No official API exists, so this polls INUMET's structured JSON feed
+(the same one their Android app uses) and only notifies Discord when
+the active advisories actually change.
 
 Install:
-    pip install requests beautifulsoup4
+    pip install requests
 
 Configure:
     Set DISCORD_WEBHOOK_URL below (or via env var) and run on a schedule
@@ -22,7 +23,6 @@ import logging
 from pathlib import Path
 
 import requests
-from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("uy_alerts")
@@ -39,7 +39,6 @@ HEADERS = {
 
 INUMET_JSON_URL = "https://www.inumet.gub.uy/reportes/riesgo/advGral.mch"
 INUMET_PAGE_URL = "https://www.inumet.gub.uy/alerta"  # linked in embeds for humans
-SINAE_URL = "https://www.gub.uy/sistema-nacional-emergencias/comunicacion/actualizaciones-emergencias"
 
 RISK_HAZARD_LABELS = {
     "riesgoViento": "Viento",
@@ -139,21 +138,6 @@ def check_inumet() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# SINAE
-# ---------------------------------------------------------------------------
-def check_sinae() -> dict:
-    """Returns the latest update entry text from SINAE's update log."""
-    resp = requests.get(SINAE_URL, headers=HEADERS, timeout=20)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    main = soup.find("main") or soup.find(id="main-content") or soup
-    text = main.get_text("\n", strip=True)
-
-    return {"raw": text, "url": SINAE_URL}
-
-
-# ---------------------------------------------------------------------------
 # Discord
 # ---------------------------------------------------------------------------
 def post_embeds_to_discord(embeds: list[dict]) -> None:
@@ -201,23 +185,6 @@ def main():
             log.info("INUMET: no change.")
     except Exception:
         log.exception("Error checking INUMET")
-
-    # --- SINAE ---
-    try:
-        sinae = check_sinae()
-        h = content_hash(sinae["raw"])
-        if state.get("sinae_hash") != h:
-            state["sinae_hash"] = h
-            post_simple_to_discord(
-                title="🚨 Actualización SINAE",
-                description=sinae["raw"][:3500],
-                url=sinae.get("url", SINAE_URL),
-                color=0xE74C3C,  # red
-            )
-        else:
-            log.info("SINAE: no change.")
-    except Exception:
-        log.exception("Error checking SINAE")
 
     save_state(state)
 
