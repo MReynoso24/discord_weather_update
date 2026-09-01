@@ -4,7 +4,7 @@ on:
   schedule:
     # Every 10 minutes. GitHub Actions cron can lag a few minutes under load;
     # that's fine for this use case. Adjust freely.
-    - cron: "*/20 * * * *"
+    - cron: "18,38,58 * * * *"
   workflow_dispatch: {}  # lets you trigger a run manually from the Actions tab
 
 # Prevent overlapping runs from racing on alert_state.json
