@@ -49,8 +49,8 @@ RISK_HAZARD_LABELS = {
     "riesgoFrio": "Frío",
 }
 
-RISK_LEVEL_NAMES = {1: "Amarilla", 2: "Naranja", 3: "Roja"}
-RISK_LEVEL_COLORS = {1: 0xF1C40F, 2: 0xE67E22, 3: 0xE74C3C}  # yellow/orange/red
+RISK_LEVEL_NAMES = {2: "Amarilla", 3: "Naranja", 4: "Roja"}
+RISK_LEVEL_COLORS = {2: 0xF1C40F, 3: 0xE67E22, 4: 0xE74C3C}  # yellow/orange/red
 
 
 # ---------------------------------------------------------------------------
